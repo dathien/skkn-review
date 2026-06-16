@@ -1,0 +1,8 @@
+{
+  "name": "SKKN Review Pro",
+  "description": "Hệ thống chuyên gia đánh giá, phản biện, và hỗ trợ hoàn thiện Sáng kiến kinh nghiệm (SKKN).",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
