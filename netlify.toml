@@ -1,10 +1,9 @@
 [build]
-  command = "echo 'Static build - no npm install needed'"
-  publish = "."
-  functions = "netlify/functions"
-
-[build.environment]
-  NODE_VERSION = "20"
+command = "echo 'Static build - no npm install needed'"
+publish = "."
 
 [functions]
-  node_bundler = "esbuild"
+directory = "netlify/functions"
+
+[functions."*"]
+node_bundler = "esbuild"
