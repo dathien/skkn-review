@@ -1,13 +1,137 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SKKN REVIEW PRO</title>
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <style>
+    :root{--bg:#f6f8fb;--card:#fff;--text:#122033;--muted:#64748b;--brand:#2563eb;--line:#e2e8f0;--danger:#dc2626;--ok:#059669}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--text)}
+    header{background:#0f172a;color:white;padding:18px 28px}header h1{margin:0;font-size:24px}header p{margin:6px 0 0;color:#cbd5e1}
+    main{max-width:1180px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:420px 1fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.06);overflow:hidden}.card h2{font-size:20px;margin:0;padding:18px 20px;border-bottom:1px solid var(--line)}.body{padding:18px 20px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:13px}label{display:block;font-weight:700;margin-bottom:7px}input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:11px 12px;font-size:15px;background:#fff}textarea{min-height:170px;resize:vertical}.drop{border:2px dashed #94a3b8;border-radius:14px;padding:18px;text-align:center;background:#f8fafc}.drop strong{display:block;margin-bottom:6px}.hint{color:var(--muted);font-size:13px;line-height:1.45}.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer}button.primary{background:var(--brand);color:white}button.secondary{background:#e2e8f0;color:#0f172a}button.danger{background:#fee2e2;color:#991b1b}button:disabled{opacity:.55;cursor:not-allowed}.alert{border-radius:10px;padding:12px 14px;margin-bottom:14px}.alert.err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}.alert.ok{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}.meta{font-size:13px;color:var(--muted);margin-top:8px}.images{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.imgbox{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f1f5f9}.imgbox img{width:100%;height:92px;object-fit:cover;display:block}.imgbox span{display:block;font-size:11px;color:#475569;padding:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.output{min-height:580px;white-space:pre-wrap;line-height:1.55;font-size:15px}.placeholder{color:var(--muted);display:flex;align-items:center;justify-content:center;min-height:540px;text-align:center}.toolbar{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap}.loader{display:none;margin:8px 0;color:var(--brand);font-weight:700}.loader.show{display:block}@media(max-width:900px){main{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header><h1>SKKN REVIEW PRO</h1><p>Upload .docx, đọc nội dung và hình ảnh, phân tích bằng Gemini qua Netlify Functions.</p></header>
+  <main>
+    <section class="card">
+      <h2>Thông tin Sáng kiến</h2>
+      <div class="body">
+        <div id="message"></div>
+        <div class="field"><label>Tên đề tài *</label><input id="title" placeholder="Ví dụ: Ứng dụng AI trong lập trình Python" /></div>
+        <div class="grid">
+          <div class="field"><label>Cấp học</label><input id="level" placeholder="THPT, THCS..." /></div>
+          <div class="field"><label>Môn học/lĩnh vực</label><input id="subject" placeholder="Tin học, Chủ nhiệm..." /></div>
+        </div>
+        <div class="field"><label>Cấp đánh giá dự kiến</label><select id="reviewLevel"><option>Cấp trường</option><option>Cấp huyện</option><option>Cấp tỉnh</option><option>Chuyên gia phản biện</option></select></div>
+        <div class="field"><label>Tải file .docx *</label><div class="drop"><input id="docx" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /><strong>Chọn file Word .docx</strong><span class="hint">App sẽ đọc văn bản và trích xuất ảnh trong file.</span></div><div id="fileMeta" class="meta"></div></div>
+        <div class="field"><label>Dán thêm nội dung hoặc ghi chú</label><textarea id="extra" placeholder="Có thể dán thêm yêu cầu riêng, hoặc dán nội dung SKKN nếu không upload file."></textarea></div>
+        <div class="field"><label>Dán ảnh minh chứng</label><div class="hint">Bấm vào trang rồi nhấn Ctrl + V để dán ảnh từ clipboard. Ảnh trong file .docx cũng được trích xuất tự động.</div><div id="images" class="images"></div></div>
+        <div class="loader" id="loader">Đang xử lý, vui lòng chờ...</div>
+        <div class="btns"><button class="primary" id="analyze">Phân tích SKKN</button><button class="secondary" id="copyPrompt">Copy nội dung đã đọc</button><button class="danger" id="clear">Xóa dữ liệu</button></div>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Báo cáo phản biện</h2>
+      <div class="toolbar"><button class="secondary" id="copyResult">Copy báo cáo</button><button class="secondary" id="downloadDocx">Tải báo cáo .docx</button><button class="secondary" id="downloadTxt">Tải .txt</button></div>
+      <div class="body"><div id="output" class="output placeholder">Kết quả phân tích sẽ hiển thị tại đây.</div></div>
+    </section>
+  </main>
+<script>
+  let extractedText = '';
+  let images = [];
+  let finalReport = '';
+  const $ = id => document.getElementById(id);
+  const msg = (text, type='err') => { $('message').innerHTML = text ? `<div class="alert ${type}">${text}</div>` : ''; };
+  const setLoading = v => { $('loader').classList.toggle('show', v); $('analyze').disabled = v; };
+  const esc = s => String(s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
+  async function fileToArrayBuffer(file){ return await file.arrayBuffer(); }
+  function dataURLToBase64(dataUrl){ return dataUrl.split(',')[1] || ''; }
+  function mimeFromName(name){ const n=name.toLowerCase(); if(n.endsWith('.png')) return 'image/png'; if(n.endsWith('.webp')) return 'image/webp'; return 'image/jpeg'; }
+  async function resizeImage(blob, name='image'){
+    const mime = blob.type || mimeFromName(name);
+    const url = URL.createObjectURL(blob);
+    try{
+      const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+      const max = 1024; let w=img.width,h=img.height; if(Math.max(w,h)>max){ if(w>h){h=Math.round(h*max/w); w=max}else{w=Math.round(w*max/h); h=max} }
+      const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+      const outMime = mime.includes('png') ? 'image/png' : 'image/jpeg';
+      const dataUrl = canvas.toDataURL(outMime, .82);
+      return { name, mimeType: outMime, data: dataURLToBase64(dataUrl), preview: dataUrl };
+    } finally { URL.revokeObjectURL(url); }
+  }
+  function renderImages(){ $('images').innerHTML = images.map((im,i)=>`<div class="imgbox"><img src="${im.preview}"><span>Hình ${i+1}: ${esc(im.name)}</span></div>`).join(''); }
+
+  $('docx').addEventListener('change', async e => {
+    const file = e.target.files[0]; if(!file) return;
+    msg(''); setLoading(true); extractedText=''; images=[]; renderImages();
+    try{
+      const ab = await fileToArrayBuffer(file);
+      const result = await mammoth.extractRawText({ arrayBuffer: ab });
+      extractedText = result.value || '';
+      const zip = await JSZip.loadAsync(ab);
+      const media = Object.keys(zip.files).filter(n => n.startsWith('word/media/') && !zip.files[n].dir);
+      for(const name of media.slice(0,6)){
+        const blob = await zip.files[name].async('blob');
+        try { images.push(await resizeImage(blob, name.split('/').pop())); } catch(err) { console.warn('Không đọc được ảnh', name, err); }
+      }
+      renderImages();
+      $('fileMeta').textContent = `Đã đọc: ${file.name} | ${extractedText.length.toLocaleString('vi-VN')} ký tự | ${images.length} ảnh`;
+      msg('Đã đọc file .docx thành công.', 'ok');
+    }catch(err){ msg('Không đọc được file .docx: '+err.message); }
+    finally{ setLoading(false); }
+  });
+
+  window.addEventListener('paste', async e => {
+    const items = e.clipboardData?.items || [];
+    for(const item of items){
+      if(item.type.startsWith('image/')){
+        const blob = item.getAsFile();
+        images.push(await resizeImage(blob, 'anh-dan-clipboard.png'));
+      }
+    }
+    if(images.length>6) images = images.slice(0,6);
+    renderImages();
+  });
+
+  function buildText(){
+    const extra = $('extra').value || '';
+    return [extractedText, extra].filter(Boolean).join('\n\n--- GHI CHÚ BỔ SUNG ---\n');
+  }
+
+  $('analyze').onclick = async () => {
+    msg(''); finalReport=''; $('output').className='output'; $('output').textContent='Đang gửi nội dung sang Gemini để phân tích...'; setLoading(true);
+    try{
+      const payload = { title:$('title').value, level:$('level').value, subject:$('subject').value, reviewLevel:$('reviewLevel').value, text:buildText(), images: images.map(({mimeType,data,name})=>({mimeType,data,name})) };
+      const res = await fetch('/.netlify/functions/review', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+      const raw = await res.text();
+      let data; try{ data=JSON.parse(raw); } catch { throw new Error('Server trả về không phải JSON: '+raw.slice(0,500)); }
+      if(!res.ok || data.error) throw new Error(data.error || 'Lỗi phân tích.');
+      finalReport = data.result || '';
+      $('output').textContent = finalReport || 'Không có kết quả.';
+    } catch(err){ $('output').className='output placeholder'; $('output').textContent='Chưa có báo cáo.'; msg(err.message); }
+    finally{ setLoading(false); }
+  };
+
+  $('copyPrompt').onclick = async()=>{ await navigator.clipboard.writeText(buildText()); msg('Đã copy nội dung đã đọc từ file.', 'ok'); };
+  $('copyResult').onclick = async()=>{ await navigator.clipboard.writeText(finalReport || $('output').textContent); msg('Đã copy báo cáo.', 'ok'); };
+  $('clear').onclick = ()=>{ extractedText=''; images=[]; finalReport=''; $('docx').value=''; $('extra').value=''; $('fileMeta').textContent=''; renderImages(); $('output').className='output placeholder'; $('output').textContent='Kết quả phân tích sẽ hiển thị tại đây.'; msg('Đã xóa dữ liệu.', 'ok'); };
+  $('downloadTxt').onclick = ()=> downloadBlob(finalReport || $('output').textContent, 'bao-cao-phan-bien-skkn.txt', 'text/plain;charset=utf-8');
+  function downloadBlob(content, filename, type){ const blob=new Blob([content],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+  function xmlEscape(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');}
+  $('downloadDocx').onclick = async()=>{
+    const content = finalReport || $('output').textContent || '';
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+    zip.folder('_rels').file('.rels', `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+    const paras = content.split(/\n+/).map(p=>`<w:p><w:r><w:t xml:space="preserve">${xmlEscape(p)}</w:t></w:r></w:p>`).join('');
+    zip.folder('word').file('document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paras}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`);
+    const blob = await zip.generateAsync({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='bao-cao-phan-bien-skkn.docx'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  };
+</script>
+</body>
+</html>
