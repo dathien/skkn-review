@@ -103,16 +103,32 @@
   }
 
   $('analyze').onclick = async () => {
-    msg(''); finalReport=''; $('output').className='output'; $('output').textContent='Đang gửi nội dung sang Gemini để phân tích...'; setLoading(true);
+    msg(''); finalReport=''; $('output').className='output'; setLoading(true);
+    const basePayload = { title:$('title').value, level:$('level').value, subject:$('subject').value, reviewLevel:$('reviewLevel').value, text:buildText() };
+    const sections = [
+      ['overview','PHẦN 1. Đánh giá tổng quan'],
+      ['criteria','PHẦN 2. Kiểm định tiêu chí'],
+      ['weaknesses','PHẦN 3. Điểm chưa thuyết phục'],
+      ['rewrite','PHẦN 4. Chỉnh sửa chi tiết'],
+      ['evidence','PHẦN 5. Gợi ý bổ sung'],
+      ['final','PHẦN 6-7. Nhận xét tổng hợp']
+    ];
     try{
-      const payload = { title:$('title').value, level:$('level').value, subject:$('subject').value, reviewLevel:$('reviewLevel').value, text:buildText(), images: images.map(({mimeType,data,name})=>({mimeType,data,name})) };
-      const res = await fetch('/.netlify/functions/review', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-      const raw = await res.text();
-      let data; try{ data=JSON.parse(raw); } catch { throw new Error('Server trả về không phải JSON: '+raw.slice(0,500)); }
-      if(!res.ok || data.error) throw new Error(data.error || 'Lỗi phân tích.');
-      finalReport = data.result || '';
+      for(let i=0;i<sections.length;i++){
+        const [section,label] = sections[i];
+        $('output').textContent = (finalReport ? finalReport + '\n\n' : '') + `⏳ Đang xử lý ${label} (${i+1}/${sections.length})...`;
+        const res = await fetch('/.netlify/functions/review', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...basePayload, section}) });
+        const raw = await res.text();
+        let data; try{ data=JSON.parse(raw); } catch { throw new Error('Server trả về không phải JSON: '+raw.slice(0,500)); }
+        if(!res.ok || data.error) throw new Error(data.error || 'Lỗi phân tích.');
+        finalReport += (finalReport?'\n\n':'') + (data.result || '');
+      }
       $('output').textContent = finalReport || 'Không có kết quả.';
-    } catch(err){ $('output').className='output placeholder'; $('output').textContent='Chưa có báo cáo.'; msg(err.message); }
+    } catch(err){
+      if(finalReport){ $('output').textContent = finalReport + '\n\n⚠️ Dừng giữa chừng: ' + (err.message||String(err)); }
+      else { $('output').className='output placeholder'; $('output').textContent='Chưa có báo cáo.'; }
+      msg(err.message||String(err));
+    }
     finally{ setLoading(false); }
   };
 
