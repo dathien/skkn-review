@@ -14,7 +14,7 @@
   </style>
 </head>
 <body>
-  <header><h1>SKKN REVIEW PRO</h1><p>Upload .docx, đọc nội dung và hình ảnh, phân tích bằng Gemini qua Netlify Functions.</p></header>
+  <header><h1>SKKN REVIEW PRO</h1><p>Upload .docx, đọc nội dung và hình ảnh, phân tích trực tiếp bằng Gemini, tránh timeout Netlify.</p></header>
   <main>
     <section class="card">
       <h2>Thông tin Sáng kiến</h2>
@@ -26,6 +26,8 @@
           <div class="field"><label>Môn học/lĩnh vực</label><input id="subject" placeholder="Tin học, Chủ nhiệm..." /></div>
         </div>
         <div class="field"><label>Cấp đánh giá dự kiến</label><select id="reviewLevel"><option>Cấp trường</option><option>Cấp huyện</option><option>Cấp tỉnh</option><option>Chuyên gia phản biện</option></select></div>
+        <div class="field"><label>Gemini API Key *</label><input id="apiKey" type="password" placeholder="Dán API key Gemini để phân tích trực tiếp, tránh timeout Netlify" /><div class="hint">Khóa chỉ lưu trên trình duyệt của thầy bằng localStorage, không gửi qua Netlify Function.</div></div>
+        <div class="field"><label>Model</label><select id="model"><option value="gemini-2.5-flash">gemini-2.5-flash</option><option value="gemini-2.0-flash">gemini-2.0-flash</option><option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option></select></div>
         <div class="field"><label>Tải file .docx *</label><div class="drop"><input id="docx" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /><strong>Chọn file Word .docx</strong><span class="hint">App sẽ đọc văn bản và trích xuất ảnh trong file.</span></div><div id="fileMeta" class="meta"></div></div>
         <div class="field"><label>Dán thêm nội dung hoặc ghi chú</label><textarea id="extra" placeholder="Có thể dán thêm yêu cầu riêng, hoặc dán nội dung SKKN nếu không upload file."></textarea></div>
         <div class="field"><label>Dán ảnh minh chứng</label><div class="hint">Bấm vào trang rồi nhấn Ctrl + V để dán ảnh từ clipboard. Ảnh trong file .docx cũng được trích xuất tự động.</div><div id="images" class="images"></div></div>
@@ -102,33 +104,71 @@
     return [extractedText, extra].filter(Boolean).join('\n\n--- GHI CHÚ BỔ SUNG ---\n');
   }
 
+
+  const sectionPrompts = [
+    ['PHẦN 1. ĐÁNH GIÁ TỔNG QUAN SKKN', 'Nhận xét ngắn gọn nhưng cụ thể theo bảng: vấn đề cần giải quyết, lý do chọn đề tài, thực trạng, giải pháp, kết quả, tính mới, hiệu quả, khả năng nhân rộng.'],
+    ['PHẦN 2. KIỂM ĐỊNH THEO 7 TIÊU CHÍ CHẤM', 'Đánh giá theo 7 tiêu chí: tính cấp thiết, tính mới, tính khoa học, tính thực tiễn, hiệu quả qua minh chứng/số liệu, khả năng nhân rộng, hình thức/ngôn ngữ. Với mỗi tiêu chí nêu: mức đánh giá, điểm mạnh, hạn chế, gợi ý chỉnh sửa cụ thể, câu văn thay thế, mức ưu tiên.'],
+    ['PHẦN 3. PHÁT HIỆN ĐIỂM CHƯA THUYẾT PHỤC', 'Chỉ rõ các nội dung còn chung chung, thiếu số liệu, thiếu minh chứng, chưa rõ vai trò giáo viên, chưa thể hiện thay đổi học sinh, thiếu so sánh trước-sau, lặp ý, chưa đúng văn phong SKKN. Trình bày dạng bảng.'],
+    ['PHẦN 4. CHỈNH SỬA CHI TIẾT', 'Chọn tối đa 5 đoạn/vấn đề quan trọng nhất cần chỉnh. Lập bảng 4 cột: Đoạn/Nội dung gốc | Vấn đề cần chỉnh | Gợi ý chỉnh sửa | Đoạn viết lại hoàn chỉnh. Không bịa số liệu.'],
+    ['PHẦN 5. GỢI Ý BỔ SUNG', 'Đề xuất số liệu cần bổ sung, minh chứng, bảng khảo sát, hình ảnh/sản phẩm học sinh, câu hỏi khảo sát trước-sau, cách trình bày kết quả để hội đồng dễ thấy hiệu quả.'],
+    ['PHẦN 6-7. NHẬN XÉT TỔNG HỢP VÀ KẾT LUẬN HÀNH ĐỘNG', 'Nhận xét như hội đồng chấm: đã đủ thuyết phục chưa, chỉnh phần nào trước, muốn nâng từ khá lên tốt cần gì, khả năng nhân rộng, xếp loại dự kiến. Kết thúc bằng 3 ưu tiên chỉnh sửa và checklist trước khi nộp.']
+  ];
+
+  function compactText(text, maxChars = 12000) {
+    text = String(text || '').replace(/\s+/g, ' ').trim();
+    if (text.length <= maxChars) return text;
+    const head = text.slice(0, Math.floor(maxChars * 0.7));
+    const tail = text.slice(-Math.floor(maxChars * 0.3));
+    return `${head}\n\n...[ĐÃ RÚT GỌN PHẦN GIỮA ĐỂ TRÁNH QUÁ TẢI]...\n\n${tail}`;
+  }
+
+  function makePrompt(sectionTitle, sectionTask, text){
+    return `Bạn là SKKN REVIEW PRO – chuyên gia giáo dục, thành viên hội đồng chấm sáng kiến kinh nghiệm và biên tập viên báo cáo khoa học sư phạm.\n\nTHÔNG TIN SKKN:\n- Tên đề tài: ${$('title').value || 'Chưa cung cấp'}\n- Cấp học: ${$('level').value || 'Chưa cung cấp'}\n- Môn học/lĩnh vực: ${$('subject').value || 'Chưa cung cấp'}\n- Cấp đánh giá dự kiến: ${$('reviewLevel').value || 'Chưa cung cấp'}\n\nNGUYÊN TẮC:\n- Góp ý thẳng, rõ, chuyên môn.\n- Không nhận xét chung chung.\n- Không bịa số liệu, minh chứng hoặc kết quả.\n- Giữ đúng tinh thần, bối cảnh, đối tượng học sinh và mục tiêu gốc.\n- Ưu tiên góp ý có thể áp dụng ngay.\n\n${sectionTitle}\n${sectionTask}\n\nNỘI DUNG SKKN ĐÃ ĐỌC:\n${compactText(text)}`;
+  }
+
+  async function callGeminiDirect(prompt, apiKey, model){
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{role:'user', parts:[{text: prompt}]}],
+        generationConfig:{temperature:0.25, topP:0.85, maxOutputTokens:1800}
+      })
+    });
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); } catch { throw new Error('Gemini trả về không phải JSON: ' + raw.slice(0,300)); }
+    if(!res.ok || data.error) throw new Error(data?.error?.message || 'Gemini API báo lỗi.');
+    const text = data?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('\n').trim();
+    if(!text) throw new Error('Gemini không trả về nội dung.');
+    return text;
+  }
+
+  window.addEventListener('load', () => {
+    const savedKey = localStorage.getItem('SKKN_GEMINI_API_KEY') || '';
+    if ($('apiKey')) $('apiKey').value = savedKey;
+  });
+
   $('analyze').onclick = async () => {
     msg(''); finalReport=''; $('output').className='output'; setLoading(true);
-    const basePayload = { title:$('title').value, level:$('level').value, subject:$('subject').value, reviewLevel:$('reviewLevel').value, text:buildText() };
-    const sections = [
-      ['overview','PHẦN 1. Đánh giá tổng quan'],
-      ['criteria','PHẦN 2. Kiểm định tiêu chí'],
-      ['weaknesses','PHẦN 3. Điểm chưa thuyết phục'],
-      ['rewrite','PHẦN 4. Chỉnh sửa chi tiết'],
-      ['evidence','PHẦN 5. Gợi ý bổ sung'],
-      ['final','PHẦN 6-7. Nhận xét tổng hợp']
-    ];
     try{
-      for(let i=0;i<sections.length;i++){
-        const [section,label] = sections[i];
-        $('output').textContent = (finalReport ? finalReport + '\n\n' : '') + `⏳ Đang xử lý ${label} (${i+1}/${sections.length})...`;
-        const res = await fetch('/.netlify/functions/review', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...basePayload, section}) });
-        const raw = await res.text();
-        let data; try{ data=JSON.parse(raw); } catch { throw new Error('Server trả về không phải JSON: '+raw.slice(0,500)); }
-        if(!res.ok || data.error) throw new Error(data.error || 'Lỗi phân tích.');
-        finalReport += (finalReport?'\n\n':'') + (data.result || '');
+      const apiKey = ($('apiKey').value || '').trim();
+      const model = $('model').value || 'gemini-2.5-flash';
+      const text = buildText();
+      if(!apiKey) throw new Error('Vui lòng nhập Gemini API Key.');
+      if(!text.trim()) throw new Error('Chưa có nội dung SKKN để phân tích.');
+      localStorage.setItem('SKKN_GEMINI_API_KEY', apiKey);
+      finalReport = '';
+      for(let i=0;i<sectionPrompts.length;i++){
+        const [title, task] = sectionPrompts[i];
+        $('output').textContent = finalReport + `\n\nĐang phân tích ${title} (${i+1}/${sectionPrompts.length})...`;
+        const part = await callGeminiDirect(makePrompt(title, task, text), apiKey, model);
+        finalReport += (finalReport ? '\n\n' : '') + part;
+        $('output').textContent = finalReport;
       }
-      $('output').textContent = finalReport || 'Không có kết quả.';
-    } catch(err){
-      if(finalReport){ $('output').textContent = finalReport + '\n\n⚠️ Dừng giữa chừng: ' + (err.message||String(err)); }
-      else { $('output').className='output placeholder'; $('output').textContent='Chưa có báo cáo.'; }
-      msg(err.message||String(err));
-    }
+      msg('Phân tích hoàn tất.', 'ok');
+    } catch(err){ $('output').className='output placeholder'; $('output').textContent='Chưa có báo cáo.'; msg(err.message); }
     finally{ setLoading(false); }
   };
 

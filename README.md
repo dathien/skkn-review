@@ -1,25 +1,10 @@
-# SKKN REVIEW PRO - Netlify Static
+# SKKN REVIEW PRO - Netlify Client Gemini Fix
 
-Bản này không dùng Vite/React, không cần npm install khi deploy Netlify. Ứng dụng chạy bằng HTML/JS thuần + Netlify Functions.
+Bản này sửa lỗi Inactivity Timeout bằng cách gọi Gemini trực tiếp từ trình duyệt, không dùng Netlify Function khi phân tích.
 
-## Deploy Netlify
+## Cách dùng
+1. Deploy lên Netlify như website tĩnh.
+2. Mở app, nhập Gemini API Key vào ô trên giao diện.
+3. Upload file .docx và bấm Phân tích SKKN.
 
-1. Upload toàn bộ thư mục này lên GitHub repo.
-2. Netlify tự đọc `netlify.toml`.
-3. Build command: `echo 'Static build - no npm install needed'`
-4. Publish directory: `.`
-5. Functions directory: `netlify/functions`
-
-## Environment variables cần thêm
-
-- `GEMINI_API_KEY`: API key từ Google AI Studio
-- `GEMINI_MODEL`: `gemini-2.5-flash`
-
-## Tính năng
-
-- Upload `.docx`
-- Đọc văn bản trong `.docx`
-- Trích xuất tối đa 6 ảnh trong `.docx`
-- Dán ảnh bằng Ctrl+V
-- Gửi văn bản + ảnh sang Gemini qua Netlify Function
-- Xuất báo cáo `.docx` và `.txt`
+Lưu ý: API key được lưu trong localStorage của trình duyệt người dùng. Nếu dùng chung cho nhiều giáo viên, nên dùng tài khoản/API riêng hoặc chuyển sang Vercel/Railway backend.
