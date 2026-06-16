@@ -14,7 +14,7 @@
   </style>
 </head>
 <body>
-  <header><h1>SKKN REVIEW PRO</h1><p>Upload .docx, đọc nội dung và hình ảnh, phân tích trực tiếp bằng Gemini, tránh timeout Netlify.</p></header>
+  <header><h1>SKKN REVIEW PRO</h1><p>Upload .docx, đọc nội dung và hình ảnh, phân tích sâu trực tiếp bằng Gemini, không qua Netlify Function.</p></header>
   <main>
     <section class="card">
       <h2>Thông tin Sáng kiến</h2>
@@ -27,7 +27,7 @@
         </div>
         <div class="field"><label>Cấp đánh giá dự kiến</label><select id="reviewLevel"><option>Cấp trường</option><option>Cấp huyện</option><option>Cấp tỉnh</option><option>Chuyên gia phản biện</option></select></div>
         <div class="field"><label>Gemini API Key *</label><input id="apiKey" type="password" placeholder="Dán API key Gemini để phân tích trực tiếp, tránh timeout Netlify" /><div class="hint">Khóa chỉ lưu trên trình duyệt của thầy bằng localStorage, không gửi qua Netlify Function.</div></div>
-        <div class="field"><label>Model</label><select id="model"><option value="gemini-2.5-flash">gemini-2.5-flash</option><option value="gemini-2.0-flash">gemini-2.0-flash</option><option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option></select></div>
+        <div class="field"><label>Model</label><select id="model"><option value="gemini-2.0-flash">gemini-2.0-flash (khuyến nghị)</option><option value="gemini-2.5-flash">gemini-2.5-flash</option><option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option></select></div>
         <div class="field"><label>Tải file .docx *</label><div class="drop"><input id="docx" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /><strong>Chọn file Word .docx</strong><span class="hint">App sẽ đọc văn bản và trích xuất ảnh trong file.</span></div><div id="fileMeta" class="meta"></div></div>
         <div class="field"><label>Dán thêm nội dung hoặc ghi chú</label><textarea id="extra" placeholder="Có thể dán thêm yêu cầu riêng, hoặc dán nội dung SKKN nếu không upload file."></textarea></div>
         <div class="field"><label>Dán ảnh minh chứng</label><div class="hint">Bấm vào trang rồi nhấn Ctrl + V để dán ảnh từ clipboard. Ảnh trong file .docx cũng được trích xuất tự động.</div><div id="images" class="images"></div></div>
@@ -106,12 +106,13 @@
 
 
   const sectionPrompts = [
-    ['PHẦN 1. ĐÁNH GIÁ TỔNG QUAN SKKN', 'Nhận xét ngắn gọn nhưng cụ thể theo bảng: vấn đề cần giải quyết, lý do chọn đề tài, thực trạng, giải pháp, kết quả, tính mới, hiệu quả, khả năng nhân rộng.'],
-    ['PHẦN 2. KIỂM ĐỊNH THEO 7 TIÊU CHÍ CHẤM', 'Đánh giá theo 7 tiêu chí: tính cấp thiết, tính mới, tính khoa học, tính thực tiễn, hiệu quả qua minh chứng/số liệu, khả năng nhân rộng, hình thức/ngôn ngữ. Với mỗi tiêu chí nêu: mức đánh giá, điểm mạnh, hạn chế, gợi ý chỉnh sửa cụ thể, câu văn thay thế, mức ưu tiên.'],
-    ['PHẦN 3. PHÁT HIỆN ĐIỂM CHƯA THUYẾT PHỤC', 'Chỉ rõ các nội dung còn chung chung, thiếu số liệu, thiếu minh chứng, chưa rõ vai trò giáo viên, chưa thể hiện thay đổi học sinh, thiếu so sánh trước-sau, lặp ý, chưa đúng văn phong SKKN. Trình bày dạng bảng.'],
-    ['PHẦN 4. CHỈNH SỬA CHI TIẾT', 'Chọn tối đa 5 đoạn/vấn đề quan trọng nhất cần chỉnh. Lập bảng 4 cột: Đoạn/Nội dung gốc | Vấn đề cần chỉnh | Gợi ý chỉnh sửa | Đoạn viết lại hoàn chỉnh. Không bịa số liệu.'],
-    ['PHẦN 5. GỢI Ý BỔ SUNG', 'Đề xuất số liệu cần bổ sung, minh chứng, bảng khảo sát, hình ảnh/sản phẩm học sinh, câu hỏi khảo sát trước-sau, cách trình bày kết quả để hội đồng dễ thấy hiệu quả.'],
-    ['PHẦN 6-7. NHẬN XÉT TỔNG HỢP VÀ KẾT LUẬN HÀNH ĐỘNG', 'Nhận xét như hội đồng chấm: đã đủ thuyết phục chưa, chỉnh phần nào trước, muốn nâng từ khá lên tốt cần gì, khả năng nhân rộng, xếp loại dự kiến. Kết thúc bằng 3 ưu tiên chỉnh sửa và checklist trước khi nộp.']
+    ['PHẦN 1. ĐÁNH GIÁ TỔNG QUAN SKKN', 'Hãy đánh giá sâu, không viết xã giao. Lập bảng gồm: Nội dung đánh giá | Nhận xét cụ thể dựa trên bài | Mức độ | Cần bổ sung gì. Bắt buộc đánh giá: vấn đề nghiên cứu, lý do chọn đề tài, thực trạng, giải pháp, kết quả, tính mới, hiệu quả, khả năng nhân rộng. Mỗi nhận xét phải gắn với chi tiết trong SKKN hoặc nêu rõ “chưa thấy trong tài liệu”.'],
+    ['PHẦN 2. KIỂM ĐỊNH THEO 7 TIÊU CHÍ CHẤM', 'Đánh giá đủ 7 tiêu chí: tính cấp thiết, tính mới, tính khoa học/logic, tính thực tiễn, hiệu quả qua minh chứng/số liệu, khả năng nhân rộng, hình thức/ngôn ngữ. Với mỗi tiêu chí trình bày 6 ý: Mức đánh giá; Điểm mạnh; Hạn chế; Gợi ý chỉnh sửa cụ thể; Câu văn thay thế; Ưu tiên chỉnh sửa. Không được gộp tiêu chí.'],
+    ['PHẦN 3. PHÁT HIỆN ĐIỂM CHƯA THUYẾT PHỤC', 'Rà soát như hội đồng chấm. Lập bảng: Vị trí/Nội dung | Vấn đề phát hiện | Vì sao làm giảm sức thuyết phục | Mức độ ảnh hưởng | Cách sửa ngay. Phải tìm các lỗi: viết chung chung, thiếu số liệu, thiếu minh chứng, chưa rõ vai trò giáo viên, chưa rõ thay đổi học sinh, thiếu so sánh trước-sau, lặp ý, văn phong chưa chuẩn, cần thêm bảng/hình/sản phẩm.'],
+    ['PHẦN 4. CHỈNH SỬA CHI TIẾT THEO BẢNG', 'Chọn 8 đến 12 đoạn/vấn đề quan trọng nhất. Lập bảng 4 cột: Đoạn/Nội dung gốc tóm tắt | Vấn đề cần chỉnh | Gợi ý chỉnh sửa | Đoạn viết lại hoàn chỉnh. Khi viết lại phải trang trọng, khoa học sư phạm, cụ thể hơn nhưng không bịa số liệu hoặc thay đổi ý chính.'],
+    ['PHẦN 5. GỢI Ý SỐ LIỆU, MINH CHỨNG, KHẢO SÁT', 'Đề xuất thật cụ thể: số liệu cần bổ sung, nguồn lấy số liệu, vị trí đưa vào bài, bảng khảo sát, câu hỏi khảo sát trước-sau, hình ảnh/sản phẩm học sinh nên đưa vào, biểu đồ nên dùng, cách trình bày kết quả. Viết thành các bảng dễ áp dụng.'],
+    ['PHẦN 6. VIẾT LẠI MỘT SỐ ĐOẠN MẪU NÂNG CHẤT', 'Tạo các đoạn mẫu có thể đưa vào SKKN: mẫu lý do chọn đề tài, mẫu mô tả thực trạng, mẫu mô tả giải pháp, mẫu trình bày kết quả, mẫu kết luận/khả năng nhân rộng. Mỗi đoạn ghi rõ “Chỉ dùng khi phù hợp với dữ liệu thực tế”. Không thêm số liệu cụ thể nếu tài liệu chưa có.'],
+    ['PHẦN 7. NHẬN XÉT HỘI ĐỒNG VÀ LỘ TRÌNH HOÀN THIỆN', 'Nhận xét tổng hợp như hội đồng chấm: SKKN đủ thuyết phục chưa, phần phải chỉnh trước tiên, điều kiện nâng từ khá lên tốt, điều kiện đạt xuất sắc, khả năng áp dụng/nhân rộng, xếp loại dự kiến. Kết thúc bằng 3 ưu tiên chỉnh sửa và checklist trước khi nộp.']
   ];
 
   function compactText(text, maxChars = 12000) {
@@ -132,8 +133,9 @@
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
+        systemInstruction:{parts:[{text:'Bạn là SKKN REVIEW PRO. Chỉ trả lời báo cáo phản biện cuối cùng bằng tiếng Việt, không chào hỏi, không nêu quá trình suy nghĩ.'}]},
         contents:[{role:'user', parts:[{text: prompt}]}],
-        generationConfig:{temperature:0.25, topP:0.85, maxOutputTokens:1800}
+        generationConfig:{temperature:0.15, topP:0.8, maxOutputTokens:4096, thinkingConfig:{thinkingBudget:0}}
       })
     });
     const raw = await res.text();
@@ -154,7 +156,7 @@
     msg(''); finalReport=''; $('output').className='output'; setLoading(true);
     try{
       const apiKey = ($('apiKey').value || '').trim();
-      const model = $('model').value || 'gemini-2.5-flash';
+      const model = $('model').value || 'gemini-2.0-flash';
       const text = buildText();
       if(!apiKey) throw new Error('Vui lòng nhập Gemini API Key.');
       if(!text.trim()) throw new Error('Chưa có nội dung SKKN để phân tích.');
